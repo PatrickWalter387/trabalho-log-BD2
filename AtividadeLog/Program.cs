@@ -1,6 +1,6 @@
 ﻿class Program
 {
-    string log = @"
+    static string log = @"
 <start T1>
 <T1,1, A,20,500>
 <start T2>
@@ -13,18 +13,76 @@
 <T4,1, B,55,100>
 ";
 
+    public static List<LogInstrucaoBase> Instrucoes { get; set; } = new List<LogInstrucaoBase>();
+
     static void Main(string[] args)
     {
-        Console.WriteLine("teste");
+        var logTxt = log.Trim();
+        SepararInstrucoes(logTxt);
+    }
+
+    static void SepararInstrucoes(string linha)
+    {
+        int de = linha.IndexOf("<") + 1;
+        int ate = linha.IndexOf(">");
+        if (de == -1 || ate == -1)
+            return;
+
+        var result = linha.Substring(de, ate - de);
+        Instrucoes.Add(new LogInstrucaoBase { Instrucao = result });
+
+        if((ate + 1) < linha.Length)
+            SepararInstrucoes(linha.Substring(ate + 1));
+    }
+}
+
+class LogInstrucaoBase
+{
+    public string? Instrucao { get; set; }
+
+    public string? PalavraChave 
+    {
+        get
+        {
+            return this.Instrucao?.Trim()?.Split(" ")?.FirstOrDefault();
+        }
+    }
+
+    public TipoInstrucao Tipo
+    {
+        get
+        {
+            switch (this.PalavraChave)
+            {
+                case "start":
+                    return TipoInstrucao.Iniciar;
+
+                case "commit":
+                    return TipoInstrucao.Comitar;
+
+                case "CKPT":
+                    return TipoInstrucao.Checkpoint;
+
+                default:
+                    return TipoInstrucao.InstrucaoUpdate;
+            }
+        }
+    }
+
+    public enum TipoInstrucao
+    {
+        Iniciar = 1,
+        Comitar = 2,
+        Checkpoint = 3,
+        InstrucaoUpdate = 4
     }
 }
 
 class LogInstrucaoUpdate
 {
-    public LogInstrucao(string linha)
+    public LogInstrucaoUpdate(string instrucao)
     {
-        linha = linha.Replace("<", "").Replace(">", "").Replace(" ", "");
-        var itens = linha.Split(",");
+        var itens = instrucao.Split(",");
 
         this.Transacao = itens[0];
         this.IdTupla = int.Parse(itens[1]);
