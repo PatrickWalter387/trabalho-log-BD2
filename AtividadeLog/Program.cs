@@ -63,8 +63,8 @@ class Program
                 }
 
                 var sql = @$"
-                    UPDATE tabela SET {instrucao.InstrucaoUpdate.Coluna} = ${instrucao.InstrucaoUpdate.ValorNovo}
-                    WHERE tabela.Id = {instrucao.InstrucaoUpdate.IdTupla};
+                    UPDATE adam_sandler_is_o_melhor SET ""{instrucao.InstrucaoUpdate.Coluna}"" = {instrucao.InstrucaoUpdate.ValorNovo}
+                    WHERE adam_sandler_is_o_melhor.Id = {instrucao.InstrucaoUpdate.IdTupla};
                 ";
                 transacao.Comandos.Add(sql);
             }
@@ -104,7 +104,10 @@ class Program
         foreach (var transacao in Transacoes.Where(m => m.Status == TipoStatusTransacao.Commitada))
         {
             foreach (var sql in transacao.Comandos)
-                Console.WriteLine($"{transacao.IdentificadorTransacao} - RODOU SQL");
+            {
+                cmd.CommandText = sql;
+                cmd.ExecuteNonQuery();
+            }
         }
 
     }
@@ -235,13 +238,13 @@ class LogInstrucaoUpdate
 {
     public LogInstrucaoUpdate(string instrucao)
     {
-        var itens = instrucao.Split(",");
+        var itens = instrucao.Trim().Split(",");
 
-        this.Transacao = itens[0];
-        this.IdTupla = int.Parse(itens[1]);
-        this.Coluna = itens[2];
-        this.ValorAntigo = int.Parse(itens[3]);
-        this.ValorNovo = int.Parse(itens[4]);
+        this.Transacao = itens[0].Trim();
+        this.IdTupla = int.Parse(itens[1].Trim());
+        this.Coluna = itens[2].Trim();
+        this.ValorAntigo = int.Parse(itens[3].Trim());
+        this.ValorNovo = int.Parse(itens[4].Trim());
     }
 
     public string? Transacao { get; set; }
