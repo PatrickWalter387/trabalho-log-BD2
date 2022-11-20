@@ -1,4 +1,6 @@
-﻿class Program
+﻿using Npgsql;
+
+class Program
 {
     static string log = @"
 <start T1>
@@ -15,9 +17,23 @@
 
     public static List<LogInstrucaoBase> Instrucoes { get; set; } = new List<LogInstrucaoBase>();
     public static List<Transacao> Transacoes { get; set; } = new List<Transacao>();
+    static string configBanco = "Host=localhost;Username=postgres;Password=postgres;Database=atividade_log";
+
+    public static Dictionary<string, List<int>> metadado = new Dictionary<string, List<int>>();
 
     static void Main(string[] args)
     {
+        metadado.Add("A", new List<int> { 20, 20, 77 });
+        metadado.Add("B", new List<int> { 55, 30, 771 });
+        ///////
+
+        using var con = new NpgsqlConnection(configBanco);
+        con.Open();
+        using var cmd = new NpgsqlCommand();
+        cmd.Connection = con;
+
+        _CriarBanco(cmd);
+
         var logTxt = log.Trim();
         SepararInstrucoes(logTxt);
 
@@ -65,19 +81,17 @@
                     return;
                 }
 
-                foreach (var comandoSql in transacao.Comandos)
-                    Console.WriteLine("Gravar aqui no banco");
-
                 transacao.Status = TipoStatusTransacao.Commitada;
             }
             else if (instrucao.Tipo == TipoInstrucao.Checkpoint)
             {
-                var transac = instrucao.TransacaoUsada; //aqui vai terq possibilitar multiplas transaca.
                 var transacoes = Transacoes
-                    .Where(m => m.IdentificadorTransacao != transac)
+                    .Where(m => !instrucao.TransacoesUsadasCheckpoint.Contains(m.IdentificadorTransacao))
                     .ToList();
 
-                Console.WriteLine($"Transação {transac} realizou REDO");
+                foreach (var transac in instrucao.TransacoesUsadasCheckpoint)
+                    Console.WriteLine($"Transação {transac} realizou REDO");
+
                 foreach (var transacao in transacoes)
                 {
                     transacao.Comandos = new List<string>();
@@ -86,6 +100,41 @@
 
             linha++;
         }
+
+        foreach (var transacao in Transacoes.Where(m => m.Status == TipoStatusTransacao.Commitada))
+        {
+            foreach (var sql in transacao.Comandos)
+                Console.WriteLine($"{transacao.IdentificadorTransacao} - RODOU SQL");
+        }
+
+    }
+
+    static void _CriarBanco(NpgsqlCommand cmd)
+    {
+        cmd.CommandText = "DROP TABLE IF EXISTS adam_sandler_is_o_melhor";
+        cmd.ExecuteNonQuery();
+
+        var itens = new List<(string, List<int>)>();
+        foreach (var item in metadado)
+            itens.Add(($"\"{item.Key}\"", item.Value));
+
+        var colunas = itens.Select(m => m.Item1).ToList();
+        cmd.CommandText = $"CREATE TABLE adam_sandler_is_o_melhor(Id serial PRIMARY KEY, {string.Join(",", colunas.Select(campo => $"{campo} int NULL"))})";
+        cmd.ExecuteNonQuery();
+
+        var inserts = "";
+        var valores = itens.Select(m => m.Item2.ToArray()).ToArray();
+        for (int coluna = 0; coluna < valores.FirstOrDefault()?.Length; coluna++)
+        {
+            var valuesInsert = new List<int>();
+            for (int linha = 0; linha < valores.GetLength(0); linha++)
+                valuesInsert.Add(valores[linha][coluna]);
+
+            inserts += $"INSERT INTO adam_sandler_is_o_melhor({string.Join(",", colunas)}) VALUES({string.Join(",", valuesInsert)}); ";
+        }
+
+        cmd.CommandText = inserts;
+        cmd.ExecuteNonQuery();
     }
 
     static void SepararInstrucoes(string linha)
@@ -119,7 +168,7 @@ class LogInstrucaoBase
     {
         get
         {
-            if (this.Tipo == TipoInstrucao.InstrucaoUpdate)
+            if (this.Tipo == TipoInstrucao.InstrucaoUpdate || this.Tipo == TipoInstrucao.Checkpoint)
                 return null;
 
             var instrucao = this.Instrucao?.Trim();
@@ -128,6 +177,19 @@ class LogInstrucaoBase
 
             var transacao = instrucao?.Split(" ")?.LastOrDefault();
             return transacao;
+        }
+    }
+
+    public List<string> TransacoesUsadasCheckpoint
+    {
+        get
+        {
+            var instrucao = this.Instrucao?.Trim();
+            int de = instrucao.IndexOf("(") + 1;
+            int ate = instrucao.IndexOf(")");
+            var result = instrucao.Substring(de, ate - de);
+
+            return result.Replace(" ", "").Split(",").ToList();
         }
     }
 
