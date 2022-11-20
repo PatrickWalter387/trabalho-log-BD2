@@ -48,6 +48,22 @@ class LogInstrucaoBase
         }
     }
 
+    public string? TransacaoUsada
+    {
+        get
+        {
+            if (this.Tipo == TipoInstrucao.InstrucaoUpdate)
+                return null;
+
+            var instrucao = this.Instrucao?.Trim();
+            if (this.Tipo == TipoInstrucao.Checkpoint)
+                instrucao = instrucao?.Replace("(", "").Replace(")", "")?.Trim();
+
+            var transacao = instrucao?.Split(" ")?.LastOrDefault();
+            return transacao;
+        }
+    }
+
     public TipoInstrucao Tipo
     {
         get
@@ -65,6 +81,22 @@ class LogInstrucaoBase
 
                 default:
                     return TipoInstrucao.InstrucaoUpdate;
+            }
+        }
+    }
+
+    public LogInstrucaoUpdate? InstrucaoUpdate
+    {
+        get
+        {
+            if(this.Tipo == TipoInstrucao.InstrucaoUpdate && this.Instrucao?.Count(c => c == ',') == 4)
+            {
+                var instrucaoUpdate = new LogInstrucaoUpdate(this.Instrucao);
+                return instrucaoUpdate;
+            }
+            else
+            {
+                return null;
             }
         }
     }
