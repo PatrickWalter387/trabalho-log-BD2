@@ -1,20 +1,8 @@
 ﻿using Npgsql;
+using System.Text.Json;
 
 class Program
 {
-    static string log = @"
-<start T1>
-<T1,1, A,20,500>
-<start T2>
-<commit T1>
-<CKPT (T2)>
-<T2,2, A,20,50>
-<start T3>
-<start T4>
-<commit T2>
-<T4,1, B,55,100>
-";
-
     public static List<LogInstrucaoBase> Instrucoes { get; set; } = new List<LogInstrucaoBase>();
     public static List<Transacao> Transacoes { get; set; } = new List<Transacao>();
     static string configBanco = "Host=localhost;Username=postgres;Password=postgres;Database=atividade_log";
@@ -23,9 +11,14 @@ class Program
 
     static void Main(string[] args)
     {
-        metadado.Add("A", new List<int> { 20, 20, 77 });
-        metadado.Add("B", new List<int> { 55, 30, 771 });
-        ///////
+        string log = File.ReadAllText($"C:\\Users\\patri\\source\\repos\\aaaaa\\AtividadeLog\\AtividadeLog\\entradaLog");
+
+        using (StreamReader r = new StreamReader("C:\\Users\\patri\\source\\repos\\aaaaa\\AtividadeLog\\AtividadeLog\\metadado.json"))
+        {
+            string json = r.ReadToEnd();
+            var jsonConvertido = JsonSerializer.Deserialize<JsonViewModel>(json);
+            metadado = jsonConvertido.INITIAL;
+        }
 
         using var con = new NpgsqlConnection(configBanco);
         con.Open();
@@ -211,6 +204,9 @@ class LogInstrucaoBase
                 case "CKPT":
                     return TipoInstrucao.Checkpoint;
 
+                case "crash":
+                    return TipoInstrucao.Crash;
+
                 default:
                     return TipoInstrucao.InstrucaoUpdate;
             }
@@ -254,6 +250,11 @@ class LogInstrucaoUpdate
     public int ValorNovo { get; set; }
 }
 
+class JsonViewModel
+{
+    public Dictionary<string, List<int>> INITIAL { get; set; }
+}
+
 class Transacao
 {
     public string? IdentificadorTransacao { get; set; }
@@ -266,7 +267,8 @@ public enum TipoInstrucao
     Iniciar = 1,
     Comitar = 2,
     Checkpoint = 3,
-    InstrucaoUpdate = 4
+    InstrucaoUpdate = 4,
+    Crash = 5
 }
 
 public enum TipoStatusTransacao
