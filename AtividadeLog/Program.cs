@@ -14,11 +14,78 @@
 ";
 
     public static List<LogInstrucaoBase> Instrucoes { get; set; } = new List<LogInstrucaoBase>();
+    public static List<Transacao> Transacoes { get; set; } = new List<Transacao>();
 
     static void Main(string[] args)
     {
         var logTxt = log.Trim();
         SepararInstrucoes(logTxt);
+
+        var linha = 1;
+        foreach (var instrucao in Instrucoes)
+        {
+            if (instrucao.Tipo == TipoInstrucao.Iniciar)
+            {
+                var transacao = new Transacao
+                {
+                    IdentificadorTransacao = instrucao.TransacaoUsada,
+                    Status = TipoStatusTransacao.Ativa
+                };
+                Transacoes.Add(transacao);
+            }
+            else if (instrucao.Tipo == TipoInstrucao.InstrucaoUpdate)
+            {
+                var transacao = Transacoes
+                    .Where(m => m.IdentificadorTransacao == instrucao.InstrucaoUpdate.Transacao)
+                    .Where(m => m.Status == TipoStatusTransacao.Ativa)
+                    .FirstOrDefault();
+
+                if (transacao == null)
+                {
+                    Console.WriteLine($"Update na linha {linha} não executado, transação informada inválida!");
+                    return;
+                }
+
+                var sql = @$"
+                    UPDATE tabela SET {instrucao.InstrucaoUpdate.Coluna} = ${instrucao.InstrucaoUpdate.ValorNovo}
+                    WHERE tabela.Id = {instrucao.InstrucaoUpdate.IdTupla};
+                ";
+                transacao.Comandos.Add(sql);
+            }
+            else if (instrucao.Tipo == TipoInstrucao.Comitar)
+            {
+                var transacao = Transacoes
+                    .Where(m => m.IdentificadorTransacao == instrucao.TransacaoUsada)
+                    .Where(m => m.Status == TipoStatusTransacao.Ativa)
+                    .FirstOrDefault();
+
+                if (transacao == null)
+                {
+                    Console.WriteLine($"Commit na linha {linha} não executado, transação informada inválida!");
+                    return;
+                }
+
+                foreach (var comandoSql in transacao.Comandos)
+                    Console.WriteLine("Gravar aqui no banco");
+
+                transacao.Status = TipoStatusTransacao.Commitada;
+            }
+            else if (instrucao.Tipo == TipoInstrucao.Checkpoint)
+            {
+                var transac = instrucao.TransacaoUsada; //aqui vai terq possibilitar multiplas transaca.
+                var transacoes = Transacoes
+                    .Where(m => m.IdentificadorTransacao != transac)
+                    .ToList();
+
+                Console.WriteLine($"Transação {transac} realizou REDO");
+                foreach (var transacao in transacoes)
+                {
+                    transacao.Comandos = new List<string>();
+                }
+            }
+
+            linha++;
+        }
     }
 
     static void SepararInstrucoes(string linha)
@@ -31,7 +98,7 @@
         var result = linha.Substring(de, ate - de);
         Instrucoes.Add(new LogInstrucaoBase { Instrucao = result });
 
-        if((ate + 1) < linha.Length)
+        if ((ate + 1) < linha.Length)
             SepararInstrucoes(linha.Substring(ate + 1));
     }
 }
@@ -40,7 +107,7 @@ class LogInstrucaoBase
 {
     public string? Instrucao { get; set; }
 
-    public string? PalavraChave 
+    public string? PalavraChave
     {
         get
         {
@@ -89,7 +156,7 @@ class LogInstrucaoBase
     {
         get
         {
-            if(this.Tipo == TipoInstrucao.InstrucaoUpdate && this.Instrucao?.Count(c => c == ',') == 4)
+            if (this.Tipo == TipoInstrucao.InstrucaoUpdate && this.Instrucao?.Count(c => c == ',') == 4)
             {
                 var instrucaoUpdate = new LogInstrucaoUpdate(this.Instrucao);
                 return instrucaoUpdate;
@@ -99,14 +166,6 @@ class LogInstrucaoBase
                 return null;
             }
         }
-    }
-
-    public enum TipoInstrucao
-    {
-        Iniciar = 1,
-        Comitar = 2,
-        Checkpoint = 3,
-        InstrucaoUpdate = 4
     }
 }
 
@@ -128,4 +187,25 @@ class LogInstrucaoUpdate
     public string? Coluna { get; set; }
     public int ValorAntigo { get; set; }
     public int ValorNovo { get; set; }
+}
+
+class Transacao
+{
+    public string? IdentificadorTransacao { get; set; }
+    public TipoStatusTransacao Status { get; set; }
+    public List<string> Comandos { get; set; } = new List<string>();
+}
+
+public enum TipoInstrucao
+{
+    Iniciar = 1,
+    Comitar = 2,
+    Checkpoint = 3,
+    InstrucaoUpdate = 4
+}
+
+public enum TipoStatusTransacao
+{
+    Ativa = 1,
+    Commitada = 2
 }
