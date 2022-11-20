@@ -18,3 +18,24 @@
         Console.WriteLine("teste");
     }
 }
+
+class LogInstrucaoUpdate
+{
+    public LogInstrucao(string linha)
+    {
+        linha = linha.Replace("<", "").Replace(">", "").Replace(" ", "");
+        var itens = linha.Split(",");
+
+        this.Transacao = itens[0];
+        this.IdTupla = int.Parse(itens[1]);
+        this.Coluna = itens[2];
+        this.ValorAntigo = int.Parse(itens[3]);
+        this.ValorNovo = int.Parse(itens[4]);
+    }
+
+    public string? Transacao { get; set; }
+    public int IdTupla { get; set; }
+    public string? Coluna { get; set; }
+    public int ValorAntigo { get; set; }
+    public int ValorNovo { get; set; }
+}
