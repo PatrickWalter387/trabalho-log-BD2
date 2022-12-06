@@ -30,9 +30,19 @@ class Program
         var logTxt = log.Trim();
         SepararInstrucoes(logTxt);
 
+        var ultimoCheckpoint = Instrucoes.LastOrDefault(m => m.Tipo == TipoInstrucao.Checkpoint);
+        var indiceCheckpoint = Instrucoes.FindLastIndex(m => m.Tipo == TipoInstrucao.Checkpoint);
+
         var linha = 1;
         foreach (var instrucao in Instrucoes)
         {
+            //pula instrucoes anteriores que nao estao no checkpoint
+            if(ultimoCheckpoint != null && (linha <= indiceCheckpoint && !ultimoCheckpoint.TransacoesUsadasCheckpoint.Contains((instrucao?.TransacaoUsada ?? instrucao?.InstrucaoUpdate?.Transacao) ?? "")))
+            {
+                linha++;
+                continue;
+            }
+
             if (instrucao.Tipo == TipoInstrucao.Iniciar)
             {
                 var transacao = new Transacao
@@ -82,9 +92,6 @@ class Program
                     .Where(m => !instrucao.TransacoesUsadasCheckpoint.Contains(m.IdentificadorTransacao))
                     .ToList();
 
-                foreach (var transac in instrucao.TransacoesUsadasCheckpoint)
-                    Console.WriteLine($"Transação {transac} realizou REDO");
-
                 foreach (var transacao in transacoes)
                 {
                     transacao.Comandos = new List<string>();
@@ -103,6 +110,39 @@ class Program
             }
         }
 
+        foreach (var transacao in Transacoes)
+        {
+            if(ultimoCheckpoint != null)
+            {
+                if(ultimoCheckpoint!.TransacoesUsadasCheckpoint.Contains(transacao!.IdentificadorTransacao) && transacao?.Status == TipoStatusTransacao.Commitada)
+                {
+                    Console.WriteLine($"Transação {transacao.IdentificadorTransacao} realizou REDO");
+                }
+                else
+                {
+                    Console.WriteLine($"Transação {transacao.IdentificadorTransacao} não realizou REDO");
+                }
+            }
+            else
+            {
+                if(transacao?.Status == TipoStatusTransacao.Commitada)
+                {
+                    Console.WriteLine($"Transação {transacao.IdentificadorTransacao} realizou REDO");
+                }
+                else
+                {
+                    Console.WriteLine($"Transação {transacao.IdentificadorTransacao} não realizou REDO");
+                }
+            }
+        }
+
+        //Imprimir banco
+        cmd.CommandText = "SELECT * FROM adam_sandler_is_o_melhor ORDER BY id";
+        var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            Console.WriteLine($"Row {reader[0]} - A: {reader[1]} B: {reader[2]}");
+        }
     }
 
     static void _CriarBanco(NpgsqlCommand cmd)
